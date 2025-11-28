@@ -7,13 +7,33 @@ import (
 	"os"
 )
 
-type cliCommand struct {
-	name		string
-	description	string
-	callback	func() error
-}
+func startRepl() {
+	reader := bufio.NewScanner(os.Stdin)
+	newConfig := Config{Next: "", Previous: nil}
+	for {
+		fmt.Print("Pokedex > ")
+		reader.Scan()
 
-var commands = make(map[string]cliCommand)
+		clean := cleanInput(reader.Text())
+		if len(clean) == 0 {
+			continue
+		}
+
+		commandName := clean[0]
+		command, exists := getCommands()[commandName]
+		if exists {
+			err := command.callback(&newConfig)
+			if err != nil {
+				fmt.Println(err)
+			}
+			continue
+		} else {
+			fmt.Println("Unknown command")
+			continue
+		}
+		
+	}
+}
 
 func cleanInput(text string) []string {
 	var split []string
@@ -24,50 +44,50 @@ func cleanInput(text string) []string {
 	return split
 }
 
-func startRepl() {
-	scanner := bufio.NewScanner(os.Stdin)
-	for {
-		fmt.Print("Pokedex > ")
-		scanner.Scan() 
-		line := scanner.Text()
-		clean := cleanInput(line)
-		command, exists := commands[clean[0]]
-		if exists {
-			err := command.callback()
-			if err != nil {
-				fmt.Println(err)
-			}
-		} else {
-			fmt.Println("Unknown command")
-		}
-		
+type cliCommand struct {
+	name		string
+	description	string
+	callback	func(*Config) error
+}
+
+func getCommands() map[string]cliCommand {
+	return map[string]cliCommand{
+		"help": {
+			name:        "help",
+			description: "Displays a help message",
+			callback:    commandHelp,
+		},
+		"exit": {
+			name:        "exit",
+			description: "Exit the Pokedex",
+			callback:    commandExit,
+		},
+		"map": {
+			name:		 "map",
+			description: "Displays the names of 20 location areas in the Pokemon world",
+			callback:	 commandMap,
+		},
+		"mapb": {
+			name:		 "mapb",
+			description: "Displays the previous 20 location areas in the Pokemon world",
+			callback:	 commandMapb,
+		},
 	}
 }
 
-func commandExit() error {
-	fmt.Println("Closing the Pokedex... Goodbye!")
-	os.Exit(0)
-	return nil
+type Page struct {
+	Count    int    `json:"count"`
+	Next     string `json:"next"`
+	Previous *string    `json:"previous"`
+	Results  []Results `json:"results"`
 }
 
-func commandHelp() error {
-	fmt.Println("Welcome to the Pokedex!")
-	fmt.Println("Usage:\n")
-	for _, value := range commands {
-		fmt.Printf("%s: %s\n", value.name, value.description)
-	}
-	return nil
+type Results struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
-func init() {
-	commands["help"] = cliCommand{
-		name:			"help",
-		description:	"Displays a help message",
-		callback:		commandHelp,
-	}
-	commands["exit"] = cliCommand{
-		name:			"exit",
-		description:	"Exit the Pokedex",
-		callback:		commandExit,
-	}
+type Config struct {
+	Next 		string
+	Previous 	*string
 }
